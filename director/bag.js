@@ -5,6 +5,7 @@ import ko from './text-bag-ko.json' with { type: 'json' };
 import en from './text-bag-en.json' with { type: 'json' };
 import { phrase } from './text.js';
 import { displayName } from '../engine/mon.mjs';
+import { leadOf } from '../engine/showdown-compat.mjs';
 import { DEFAULT_LANG } from './lang.js';
 
 const PHRASES = { ko, en };
@@ -39,47 +40,51 @@ export function createBag({ sim, battle, names, spec, wild, lang = DEFAULT_LANG 
     case 'notfainted': return { blocked: bagText('party-ui-handler.hasEnergy', { pokemonName: pokemonName(names, pokemon) }, lang) };
     case 'semiinvulnerable': return { blocked: bagText('own.ballNoTarget', {}, lang) };
     case 'norate': case 'nofoe': return { blocked: bagText('battle.noPokeballForce', {}, lang) };
+    case 'twofoes': return { blocked: bagText('battle.noPokeballMulti', {}, lang) };
 
     default: return { blocked: bagText('party-ui-handler.anyEffect', {}, lang) };
     }
   };
 
   const targetKind = id => isBall(id) ? 'enemy' : BAG_ITEMS[id].boost || BAG_ITEMS[id].crit ? 'active' : 'party';
-  function itemView(id) {
+  // position: the field position whose turn uses the item (a double battle), else null for the lead
+  const user = position => (position === null ? leadOf(side) : side.active[position]);
+  const at = position => (position === null ? {} : { position });
+  function itemView(id, position) {
     const base = { id, name: names.item(id), count: counts.get(id), target: targetKind(id) };
-    if (base.target === 'enemy') return { ...base, ...reason(checkBagItem(battle, { item: id })) };
-    const active = side.active[0];
-    if (base.target === 'active') return { ...base, ...reason(checkBagItem(battle, { item: id, target: active.m.uid }), active) };
+    if (base.target === 'enemy') return { ...base, ...reason(checkBagItem(battle, { item: id, ...at(position) })) };
+    const active = user(position);
+    if (base.target === 'active') return { ...base, ...reason(checkBagItem(battle, { item: id, target: active.m.uid, ...at(position) }), active) };
 
     const slots = side.pokemon.map(pokemon => {
       const target = pokemon.m.uid;
-      if (!BAG_ITEMS[id].oneMove) return reason(checkBagItem(battle, { item: id, target }), pokemon);
+      if (!BAG_ITEMS[id].oneMove) return reason(checkBagItem(battle, { item: id, target, ...at(position) }), pokemon);
 
       return { moves: pokemon.moveSlots.map(slot => ({ name: names.move(slot.id), pp: slot.pp, maxpp: slot.maxpp,
-        ...reason(checkBagItem(battle, { item: id, target, move: slot.id }), pokemon) })) };
+        ...reason(checkBagItem(battle, { item: id, target, move: slot.id, ...at(position) }), pokemon) })) };
     });
     return { ...base, slots };
   }
   return {
     counts,
 
-    menu() {
+    menu(position = null) {
 
-      const probe = checkBagItem(battle, { item: 'potion', target: side.active[0]?.m.uid });
+      const probe = checkBagItem(battle, { item: 'potion', target: user(position)?.m.uid, ...at(position) });
       const locked = !probe.ok && ['ended', 'notyourturn', 'locked'].includes(probe.reason);
       return {
         pockets: POCKETS.map(pocket => ({ id: pocket.id, name: bagText(`own.pocket.${pocket.id}`, {}, lang),
-          items: pocket.items.filter(id => counts.get(id) > 0).map(itemView) })),
+          items: pocket.items.filter(id => counts.get(id) > 0).map(id => itemView(id, position)) })),
         ...(locked ? { blocked: bagText('own.bagLocked', {}, lang) } : {}),
       };
     },
 
-    choice(choice) {
+    choice(choice, position = null) {
       const id = choice.item;
       if (!(counts.get(id) > 0)) throw new Error('Invalid player choice');
-      const pick = { item: id, target: null, move: null };
+      const pick = { item: id, target: null, move: null, ...at(position) };
       const kind = targetKind(id);
-      if (kind === 'active') pick.target = side.active[0]?.m.uid;
+      if (kind === 'active') pick.target = user(position)?.m.uid;
       else if (kind === 'party') {
         const pokemon = side.pokemon[choice.slot];
         if (!Number.isInteger(choice.slot) || !pokemon) throw new Error('Invalid player choice');
@@ -94,7 +99,8 @@ export function createBag({ sim, battle, names, spec, wild, lang = DEFAULT_LANG 
       return { bag: pick };
     },
     owns: choice => typeof choice === 'object' && !!choice?.bag,
-    commit: choice => chooseBagItem(battle, choice.bag).ok,
+    // choice.parts: every field position's choice when the item takes one position's turn in a double battle (director/double.js)
+    commit: choice => chooseBagItem(battle, choice.bag, choice.parts ?? null).ok,
 
     spend(id) { if (counts.get(id) > 0) counts.set(id, counts.get(id) - 1); },
     left: () => Object.fromEntries(counts),

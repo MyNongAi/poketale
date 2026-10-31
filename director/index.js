@@ -276,7 +276,7 @@ export async function runBattle({ sim, spec, options = {}, view, names, lang = D
     async function choosePlayer(request) {
 
       if (battle.activePerHalf > 1) {
-        return chooseDouble({ battle, view, names, lang, run, gimmicks, switchChoice, moveDeniedText,
+        return chooseDouble({ battle, view, names, lang, run, bag, gimmicks, switchChoice, moveDeniedText,
           partySlots: (req, extra) => partySlots(battle, names, lang, req, { ...extra, options: battleOptions }) }, request);
       }
       if (request.forceSwitch) {
@@ -385,7 +385,7 @@ export async function runBattle({ sim, spec, options = {}, view, names, lang = D
 
       if (playerChoice && !input(['p1', playerChoice])) {
 
-        const parts = typeof playerChoice === 'string' ? playerChoice.split(', ') : [];
+        const parts = typeof playerChoice === 'string' ? playerChoice.split(', ') : playerChoice?.parts ?? [];
         const retried = battle.sides[0].activeRequest?.active ?? [];
         const trapped = parts.findIndex((part, i) => part.startsWith('switch') && retried[i]?.trapped);
         if (trapped >= 0) {

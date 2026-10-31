@@ -10,3 +10,6 @@ export const BOX_SIZE = 30;
 export const BOX_NAME_MAX = 16;
 
 export const PLAYER_NAME = 'Player';
+
+// Battle styles of the settings: 'auto' follows the battle block, the others hold for every trainer battle
+export const BATTLE_STYLES = ['auto', 'single', 'double'];

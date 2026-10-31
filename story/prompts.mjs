@@ -11,10 +11,13 @@ export const outcomeText = outcome => OUTCOME_EN[outcome] ?? outcome;
 const speciesOf = battle => battle?.team?.[0]?.species ?? 'Pokémon';
 const trainerOf = battle => battle?.name || battle?.trainerClass || 'Trainer';
 
+// Wild opponents as the story names them: one, or two in a wild double battle
+const wildText = (battle, namer, { level = false, article = '' } = {}) => (battle?.team?.length ? battle.team : [{ species: speciesOf(battle) }]).slice(0, 2)
+  .map(mon => `${article}${article ? 'wild' : 'Wild'} ${namer.species(mon.species)}${level && mon.level ? ` Lv${mon.level}` : ''}`).join(' & ');
+
 export function resultLine({ outcome, battle, caught = null, evolutions = [], lang = 'ko', en = null }) {
   const namer = createNamer({ lang, en });
-  const mon = battle?.team?.[0];
-  const opponent = battle?.wild ? `Wild ${namer.species(speciesOf(battle))}${mon?.level ? ` Lv${mon.level}` : ''}` : trainerOf(battle);
+  const opponent = battle?.wild ? wildText(battle, namer, { level: true }) : trainerOf(battle);
   const parts = [`Opponent: ${opponent}`, `Outcome: ${outcomeText(outcome)}`];
   if (caught?.species) parts.push(`Caught: ${namer.species(caught.species)} → ${caught.storage ? 'Storage' : 'Party'}`);
   const evolved = (evolutions ?? []).filter(e => e?.evolved === true);
@@ -28,11 +31,11 @@ const turnsText = span => (span.fromTurn === span.toTurn ? `turn ${span.fromTurn
 
 export function storyOoc(format, { battle, result = null, ended = false, first = true, read, screen = [], lang = 'ko', en = null }) {
   const namer = createNamer({ lang, en });
-  const opponent = battle?.wild ? `the wild ${namer.species(speciesOf(battle))}` : trainerOf(battle);
+  const opponent = battle?.wild ? wildText(battle, namer, { article: 'the ' }) : trainerOf(battle);
   const summary = format === 'summary';
   const span = turnSpan(read);
   const outcome = ended ? ` Result: ${outcomeText(outcomeOf(result))}.` : '';
-  const sides = { theirs: trainerOf(battle), wild: !!battle?.wild };
+  const sides = { theirs: trainerOf(battle), wild: !!battle?.wild, ...(battle?.ally ? { ally: battle.ally } : {}) };
   const below = summary ? '' : ' below';
   const facts = (summary ? '. Fill in the details yourself, keeping to these facts' : ', keeping to the facts')
     + (ended ? '.' : ", and stop there. The battle isn't over yet.");

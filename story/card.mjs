@@ -25,13 +25,18 @@ export function placeName(place, lang) {
 const timeName = (time, lang) => (TIMES.has(time) ? say(lang, `time.${time}`) : time ? String(time) : '');
 
 const speciesName = (species, lang) => namesIn(lang).species(species);
-const subLine = (spec, lang) => [placeName(spec.place, lang), timeName(spec.time, lang)].filter(Boolean).join(' · ');
+// Double or tag battle note: spec.double / spec.ally as the settings leave them (story-link cardView)
+const styleName = (spec, lang) => (spec.ally ? say(lang, 'card.tag', { name: spec.ally.name || say(lang, 'spec.ally') }) : spec.double ? say(lang, 'card.double') : '');
+const subLine = (spec, lang) => [placeName(spec.place, lang), timeName(spec.time, lang), styleName(spec, lang)].filter(Boolean).join(' · ');
 
 export function battleTitle(spec, lang, { level = true } = {}) {
   if (!spec) return say(lang, 'card.title.battle');
   if (spec.wild) {
     const mon = spec.team?.[0];
     if (!mon) return say(lang, 'card.title.wildNone');
+    const withLevel = m => `${speciesName(m.species, lang)}${level && m.level ? ` Lv${m.level}` : ''}`;
+    const pair = spec.double !== false && spec.team[1];
+    if (pair) return say(lang, 'card.title.wildPair', { a: withLevel(mon), b: withLevel(pair) });
     return `${say(lang, 'card.title.wild', { species: speciesName(mon.species, lang) })}${level && mon.level ? ` Lv${mon.level}` : ''}`;
   }
   return spec.name || spec.trainerClass || say(lang, 'card.title.trainer');

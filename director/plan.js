@@ -126,6 +126,8 @@ export async function planTurns(sim, snapshot, turns, { options = {}, enemyAI, n
     for (const command of turns.slice(0, PLAN_MAX_TURNS)) {
       const request = p1();
       if (stop || battle.ended || !request || request.wait || (request.forceSwitch && results.length)) { results.push({ state: 'dropped' }); stop = true; continue; }
+      // Story commands name one Pokemon's action: a double battle is commanded on the battle screen
+      if (battle.activePerHalf > 1) { results.push({ state: 'rejected', reason: 'double' }); stop = true; continue; }
       const from = battlePoint(battle);
       const mine = resolveMine(ctx, request, command.me);
       if (!mine.choice) { results.push({ state: 'rejected', reason: mine.reason, ...(mine.text ? { text: mine.text } : {}) }); stop = true; continue; }

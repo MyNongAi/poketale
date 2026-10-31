@@ -22,7 +22,10 @@ class: class
 rank: normal|boss
 place: place
 time: day|night
+format: single|double
 pokemon: Species Lv{n} | field value | …
+ally: name
+ally pokemon: Species Lv{n} | field value | …
 </pkb-battle>
 \`\`\`
 
@@ -31,7 +34,10 @@ pokemon: Species Lv{n} | field value | …
 - Give every Trainer a personal name, even minor ones (e.g., Bug Catcher Tim).
 - rank: boss for Gym Leaders, Elite Four members, Champions, and other climactic battles; otherwise normal.
 - place: One of: town, plains, grass, tall grass, metropolis, forest, sea, swamp, beach, lake, seabed, mountain, badlands, cave, desert, ice cave, meadow, power plant, volcano, graveyard, dojo, factory, ruins, wasteland, abyss, space, construction site, jungle, fairy cave, temple, slum, snowy forest, island, laboratory.
-- pokemon: One line per Pokémon in sending-out order; 1 for a wild Pokémon, up to 6 for a Trainer. Species and level are required. Optional fields: ability, moves, item, nature, gender, shiny, tera, nickname (in the story's language), hp (e.g., 60%), status (par, brn, slp, frz, psn, tox). Anything left out is filled in automatically.
+- format: Trainer only. double when the battle is a Double Battle, where each side has two Pokémon out at once (e.g., a Double Battle challenge, twins, or two opposing Trainers teaming up); otherwise single, or leave it out.
+- pokemon: One line per Pokémon in sending-out order; 1 for a wild Pokémon (2 when two wild Pokémon attack together), up to 6 for a Trainer. Species and level are required. Optional fields: ability, moves, item, nature, gender, shiny, tera, nickname (in the story's language), hp (e.g., 60%), status (par, brn, slp, frz, psn, tox). Anything left out is filled in automatically.
+- Two opposing Trainers battling together: put both names in name (e.g., Twins Amy & May) and list all their Pokémon as pokemon lines.
+- ally, ally pokemon: Trainer battles only, when another Trainer fights on {{user}}'s side (a Tag Battle). ally is that Trainer's name; each ally pokemon line is one of the ally's Pokémon, with the same fields as pokemon. A Tag Battle is a Double Battle: {{user}} and the ally each send out one Pokémon. Never list {{user}}'s own Pokémon.
 - Use official English names for species, moves, items, abilities, and natures.
 
 ### Battle Results
@@ -51,6 +57,24 @@ place: mountain
 time: day
 pokemon: Geodude Lv12
 pokemon: Onix Lv14 | moves Tackle, Rock Tomb | item Hard Stone
+</pkb-battle>
+\`\`\`
+A Tag Battle with an ally against two Trainers:
+\`\`\`
+<pkb-battle>
+opponent: trainer
+name: Grunts Ken & Jo
+gender: male
+look: young man
+class: team grunt
+rank: normal
+place: forest
+time: night
+format: double
+pokemon: Zubat Lv11
+pokemon: Koffing Lv12
+ally: Ranger Mia
+ally pokemon: Pikachu Lv12 | moves Thunder Shock, Quick Attack
 </pkb-battle>
 \`\`\``;
 

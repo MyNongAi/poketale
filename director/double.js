@@ -44,10 +44,17 @@ async function forcedSwitches(ctx, request) {
   return picks.join(', ');
 }
 
+// The first field position the player commands this turn: run and the whole-side choices start there
+function firstOwn(side, request) {
+  const i = request.active.findIndex((active, j) => { const p = side.active[j]; return p && !p.fainted && !active.commanding && !p.m.partner; });
+  return i < 0 ? 0 : i;
+}
+
 async function commands(ctx, request) {
-  const { battle, view, run } = ctx;
+  const { battle, view, run, bag } = ctx;
   const side = battle.sides[0];
   const picks = [];
+  const first = firstOwn(side, request);
   for (let i = 0; i < request.active.length;) {
     const active = request.active[i], pokemon = side.active[i];
     if (!pokemon || pokemon.fainted || active.commanding) { picks[i++] = 'pass'; continue; }
@@ -56,24 +63,33 @@ async function commands(ctx, request) {
 
     const asked = picks.some(pick => typeof pick === 'object');
     const chosen = new Set(picks.filter(pick => pick?.slot !== undefined).map(pick => pick.slot));
-    const choice = await view.chooseAction(commandOptions(ctx, request, i, chosen, { back: asked, gimmickUsed: picks.some(pick => pick?.gimmick) }));
+    const choice = await view.chooseAction(commandOptions(ctx, request, i, chosen, { back: asked, first, gimmickUsed: picks.some(pick => pick?.gimmick), itemUsed: picks.some(pick => pick?.bag) }));
     if (choice?.kind === 'back') {
       if (!asked) throw new Error('Invalid player choice');
       picks.length = 0; i = 0;
       continue;
     }
     if (choice?.kind === 'run') {
-      if (i !== 0) throw new Error('Invalid player choice');
+      if (i !== first) throw new Error('Invalid player choice');
       return run.choice();
+    }
+    // A bag item takes this position's turn only; the other positions still act (one item a turn)
+    if (choice?.kind === 'item') {
+      if (!bag || picks.some(pick => pick?.bag)) throw new Error('Invalid player choice');
+      picks[i] = { ...bag.choice(choice, i), text: 'pass' };
+      i++;
+      continue;
     }
     picks[i] = pickOf(ctx, request, i, choice, chosen);
     i++;
   }
-  return picks.map(pick => (typeof pick === 'string' ? pick : pick.text)).join(', ');
+  const parts = picks.map(pick => (typeof pick === 'string' ? pick : pick.text));
+  const item = picks.find(pick => pick?.bag);
+  return item ? { bag: item.bag, parts } : parts.join(', ');
 }
 
-function commandOptions(ctx, request, i, chosen, { back, gimmickUsed }) {
-  const { battle, names, lang, run, gimmicks } = ctx;
+function commandOptions(ctx, request, i, chosen, { back, first = 0, gimmickUsed, itemUsed }) {
+  const { battle, names, lang, run, gimmicks, bag } = ctx;
   const active = request.active[i], pokemon = battle.sides[0].active[i];
   const moves = active.moves.map(option => {
     const move = battle.dex.moves.get(option.id);
@@ -92,7 +108,8 @@ function commandOptions(ctx, request, i, chosen, { back, gimmickUsed }) {
     position: positionAt(0, i), ...(back ? { back: true } : {}), moves, canSwitch: true, party,
 
     ...(gimmickUsed ? {} : gimmickOptions(request, gimmicks, i)),
-    ...(i === 0 ? { run: run.menu() } : {}),
+    ...(bag && !itemUsed ? { bag: bag.menu(i) } : {}),
+    ...(i === first ? { run: run.menu() } : {}),
   };
 }
 

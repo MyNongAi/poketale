@@ -1,4 +1,4 @@
-import { chooseEventAction, findTrap } from './showdown-compat.mjs';
+import { chooseEventAction, findTrap, leadOf } from './showdown-compat.mjs';
 
 export function installRun(sim, battle, options = {}) {
 	if (battle.storyRun) throw new Error('도망가기가 이미 설치됐습니다');
@@ -27,7 +27,7 @@ export function checkRun(battle) {
 	if (battle.ended) return fail('ended');
 	const side = battle.sides[0];
 	if (side.requestState !== 'move' || side.choice.cantUndo) return fail('notyourturn');
-	const user = side.active[0];
+	const user = leadOf(side);
 	if (!user || user.fainted) return fail('notyourturn');
 	if (!state.wild) return fail('trainer');
 
@@ -66,7 +66,7 @@ export function forfeit(battle) {
 	const check = checkForfeit(battle);
 	if (!check.ok) return check;
 	const side = battle.sides[0];
-	const user = side.active[0];
+	const user = leadOf(side);
 	side.clearChoice();
 	battle.storyRun.forfeited = true;
 	battle.add('-story-forfeit', user ?? side.id, user?.m.uid ?? '');
@@ -90,8 +90,10 @@ export function escapeOdds(playerSpeed, wildSpeed, attempts) {
 export const unmodifiedSpeed = pokemon => pokemon.getStat('spe', true, true);
 
 function attemptRun(battle, state) {
-	const user = battle.sides[0].active[0];
-	const foe = battle.sides[1].active[0];
+	const user = leadOf(battle.sides[0]);
+
+	// With two wild Pokemon out, the faster one decides the odds
+	const foe = battle.sides[1].active.filter(p => p && !p.fainted).sort((a, b) => unmodifiedSpeed(b) - unmodifiedSpeed(a))[0];
 	if (!user || user.fainted) return;
 	const guarantee = escapeGuarantee(user);
 	const from = guarantee === 'ability' ? ['[from] ability: Run Away'] : guarantee === 'item' ? ['[from] item: Smoke Ball'] : [];

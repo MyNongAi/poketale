@@ -243,7 +243,7 @@ export function renderDiary({ events = [], errors = [], forge = null }, lang, na
   return `\n\n<div class="x-risu-pkb-logrow">${log}{{#if {{equal::{{chat_index}}::${forge.at}}}}}${slot}{{/if}}</div>\n\n`;
 }
 
-const COMMAND_WHY = new Set(['noMove', 'noPp', 'disabled', 'noSwitch', 'trapped', 'noItem', 'cantUse', 'cantRun']);
+const COMMAND_WHY = new Set(['noMove', 'noPp', 'disabled', 'noSwitch', 'trapped', 'noItem', 'cantUse', 'cantRun', 'double']);
 
 function commandWords(c, lang, names) {
   if (!c) return '';

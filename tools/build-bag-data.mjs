@@ -9,7 +9,7 @@ const load = async path => JSON.parse(await readFile(new URL(path, PR), 'utf8'))
 
 const keys = {
 
-  battle: ['singleWildAppeared', 'pokemonCaught', 'pokemonBrokeFree', 'noPokeballTrainer', 'noPokeballForce', 'regainHealth', 'ppHealBerry'],
+  battle: ['singleWildAppeared', 'pokemonCaught', 'pokemonBrokeFree', 'noPokeballTrainer', 'noPokeballForce', 'noPokeballMulti', 'regainHealth', 'ppHealBerry'],
 
   'party-ui-handler': ['anyEffect', 'hasEnergy'],
   'status-effect': ['poison.heal', 'toxic.heal', 'paralysis.heal', 'sleep.heal', 'freeze.heal', 'burn.heal'],

@@ -1,7 +1,7 @@
 import { BALLS, ballModifier, captureValues, rollCapture } from './capture.mjs';
 import { awardCaptureExperience } from './exp.mjs';
 import { PARTY_MAX, toID } from './mon.mjs';
-import { chooseEventAction, revive } from './showdown-compat.mjs';
+import { chooseEventAction, chooseSlotEvent, leadOf, revive } from './showdown-compat.mjs';
 
 // Bag items usable in battle. Balls are in capture.mjs BALLS.
 export const BAG_ITEMS = {
@@ -99,13 +99,19 @@ export function bagResult(battle) {
 
 const fail = (reason, detail) => ({ ok: false, reason, ...(detail ? { detail } : {}) });
 
+// The Pokemon using a bag item: the one at choice.position (a double battle field position), else the side's lead
+const userOf = (side, choice) => (Number.isInteger(choice?.position) ? side.active[choice.position] : leadOf(side));
+
+// The wild Pokemon a ball can aim at: the only one left standing (with two out, the player can't aim)
+const liveFoes = battle => battle.sides[1].active.filter(p => p && !p.fainted);
+
 export function checkBagItem(battle, choice) {
 	const state = battle.storyBag;
 	if (!state) throw new Error('installBag 을 먼저 부르세요');
 	if (battle.ended) return fail('ended');
 	const side = battle.sides[0];
 	if (side.requestState !== 'move' || side.choice.cantUndo) return fail('notyourturn');
-	const user = side.active[0];
+	const user = userOf(side, choice);
 	if (!user || user.fainted) return fail('notyourturn');
 
 	if (user.getLockedMove()) return fail('locked');
@@ -152,9 +158,10 @@ function ppSlots(target, item, move) {
 const realSpecies = pokemon => pokemon.battle.dex.species.get(pokemon.m.start.species);
 
 function checkBall(battle, state, id) {
-	const foe = battle.sides[1].active[0];
-	if (!foe || foe.fainted) return fail('nofoe');
+	const foes = liveFoes(battle), foe = foes[0];
+	if (!foe) return fail('nofoe');
 	if (!state.options.wild) return { ok: true };
+	if (foes.length > 1) return fail('twofoes');
 
 	if (foe.isSemiInvulnerable()) return fail('semiinvulnerable');
 	if (!BALLS[id].master && !catchRateOf(state, realSpecies(foe))) return fail('norate', realSpecies(foe).name);
@@ -165,11 +172,15 @@ function catchRateOf(state, species) {
 	return state.catchRates?.[species.num] || 0;
 }
 
-export function chooseBagItem(battle, choice) {
+// parts: in a double battle, every position's choice ('move N [target]', 'switch N', 'pass'); the item takes only choice.position's turn
+export function chooseBagItem(battle, choice, parts = null) {
 	const check = checkBagItem(battle, choice);
 	if (!check.ok) return check;
-	battle.storyBag.pending = { item: toID(choice.item), target: choice.target ?? null, move: choice.move ? toID(choice.move) : null };
-	chooseEventAction(battle, battle.sides[0], 'StoryBag');
+	const position = Number.isInteger(choice.position) ? choice.position : null;
+	battle.storyBag.pending = { item: toID(choice.item), target: choice.target ?? null, move: choice.move ? toID(choice.move) : null, ...(position !== null ? { position } : {}) };
+	if (position !== null && parts) {
+		if (!chooseSlotEvent(battle, battle.sides[0], position, 'StoryBag', parts)) { battle.storyBag.pending = null; return fail('otherchoice'); }
+	} else chooseEventAction(battle, battle.sides[0], 'StoryBag');
 	return { ok: true };
 }
 
@@ -248,8 +259,8 @@ function useItem(sim, battle, state, choice, side = battle.sides[0]) {
 }
 
 function throwBall(sim, battle, state, choice) {
-	const foe = battle.sides[1].active[0];
-	const user = battle.sides[0].active[0];
+	const foe = liveFoes(battle)[0] ?? battle.sides[1].active[0];
+	const user = userOf(battle.sides[0], choice);
 	if (!state.options.wild) {
 
 		// Trainer battle: the opponent blocks the ball. The turn is used and the ball is not consumed

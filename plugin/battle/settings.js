@@ -7,6 +7,7 @@ import { GAME_SPEEDS, DEFAULT_SPEED } from '../../view/game-speed.js';
 import { QUALITIES as QUALITY_IDS } from '../../view/quality.js';
 import { MAINLINE_FORMAT, CHAMPIONS_FORMAT } from '../../engine/rules.mjs';
 import { EXP_SHARE_MODES } from '../../story/items.mjs';
+import { BATTLE_STYLES as BATTLE_STYLE_IDS } from '../../story/rules.mjs';
 import { shrinkPicture } from './my-picture.js';
 import { loadFont } from '../../view/fonts.js';
 import { FONT, noteRule } from '../../story/card.mjs';
@@ -28,7 +29,7 @@ export const langOf = tag => (/^ko\b/i.test(String(tag ?? '')) ? 'ko' : 'en');
 
 export const hostLang = () => langOf(globalThis.navigator?.language);
 export const DEFAULT_SETTINGS = Object.freeze({ iron: false, sound: false, sendFormat: 'key', theme: DEFAULT_THEME, orientation: 'portrait', lang: null, autoSend: false, aux: false, auxRecent: 8, oocTrial: false, difficulty: 'normal',
-  rule: 'mainline', expShare: 'always', speed: DEFAULT_SPEED, typeHints: false, moveAnims: true, quality: 'high', silhouette: true,
+  rule: 'mainline', battleStyle: 'auto', expShare: 'always', speed: DEFAULT_SPEED, typeHints: false, moveAnims: true, quality: 'high', silhouette: true,
   looks: Object.freeze({}), oldLook: null, debug: false,
   bots: Object.freeze([]), botsOff: Object.freeze([]) });
 
@@ -48,6 +49,7 @@ export const DIFFICULTIES = labelled(DIFFICULTY_IDS, 'settings.difficulty');
 const RULE_FORMATS = { mainline: MAINLINE_FORMAT, champions: CHAMPIONS_FORMAT };
 export const RULES = labelled(RULE_IDS, 'settings.rule');
 export const EXP_SHARES = labelled(EXP_SHARE_MODES, 'settings.expShare');
+export const BATTLE_STYLES = labelled(BATTLE_STYLE_IDS, 'settings.battleStyle');
 export const ruleFormat = rule => RULE_FORMATS[rule];
 export const SPEEDS = perLang(t => Object.freeze(GAME_SPEEDS.map(speed => Object.freeze([speed, t('settings.speed', { speed })]))));
 export const QUALITIES = labelled(QUALITY_IDS, 'settings.quality');
@@ -73,7 +75,7 @@ export const SETTING_TABS = perLang((t, lang) => {
   const row = (key, options, extra = {}) => ({ key, label: t(`settings.row.${key}`), ...(options ? { options } : {}), ...('help' in extra ? {} : { help: t(`settings.help.${key}`) }), ...extra });
   const onOff = ON_OFF(lang);
   return Object.freeze([
-    { id: 'battle', rows: [row('rule', RULES(lang)), row('expShare', EXP_SHARES(lang)), row('iron', onOff), row('difficulty', DIFFICULTIES(lang)), row('speed', SPEEDS(lang)), row('typeHints', onOff)] },
+    { id: 'battle', rows: [row('rule', RULES(lang)), row('battleStyle', BATTLE_STYLES(lang)), row('expShare', EXP_SHARES(lang)), row('iron', onOff), row('difficulty', DIFFICULTIES(lang)), row('speed', SPEEDS(lang)), row('typeHints', onOff)] },
     { id: 'screen', rows: [
       ...(LANG_OPEN ? [row('lang', LANGS, { help: LANG_HELP })] : []),
       row('sound', onOff), row('moveAnims', onOff),
@@ -125,6 +127,7 @@ export function normalizeSettings(raw) {
     oocTrial: s.oocTrial === true,
     difficulty: pick(s.difficulty, DIFFICULTY_IDS, DEFAULT_SETTINGS.difficulty),
     rule: pick(s.rule, RULE_IDS, DEFAULT_SETTINGS.rule),
+    battleStyle: pick(s.battleStyle, BATTLE_STYLE_IDS, DEFAULT_SETTINGS.battleStyle),
     expShare: pick(s.expShare, EXP_SHARE_MODES, DEFAULT_SETTINGS.expShare),
     speed: pick(s.speed, GAME_SPEEDS, DEFAULT_SETTINGS.speed),
     typeHints: s.typeHints === true,

@@ -34,15 +34,16 @@ export async function throwBall(scene, ball, outcome) {
   finally { globalThis.performance?.mark?.('pb:ball-end', { detail: { ball, ...times } }); }
 }
 
-async function play(scene, ball, { shakes = 0, result, critical = false } = {}, times) {
+// position: the field position aimed at ('enemy', or 'enemy2' in a double battle)
+async function play(scene, ball, { shakes = 0, result, critical = false, position = 'enemy' } = {}, times) {
   scene.requireReady();
   if (!['caught', 'broke', 'blocked'].includes(result)) throw new Error(`Invalid ball result: ${result}`);
-  const pokemon = scene.requireMon('enemy');
+  const pokemon = scene.requireMon(position);
   await loadBallThrow(scene);
   scene.life.check();
   const key = ballFrame(ball), sound = (path, volume) => { scene.audio.play(path, 1, volume); };
 
-  if (result !== 'blocked') scene.effects.showDoll('enemy', false);
+  if (result !== 'blocked') scene.effects.showDoll(position, false);
   const container = pokemon.container, originalY = container.y, scale = pokemon.getSpriteScale();
   const [fx, fy] = pokemon.getFieldPositionOffset();
 
@@ -96,7 +97,7 @@ async function play(scene, ball, { shakes = 0, result, critical = false } = {}, 
     if (pokemon.mon.status !== 'slp') scene.audio.cry(pokemon.mon, pokemon.mon.hp / pokemon.mon.maxhp <= 0.25);
     pokemon.tint(ballTint(key));
     container.setVisible(true);
-    scene.effects.showDoll('enemy', true);
+    scene.effects.showDoll(position, true);
     setFrame(`${key}_opening`, `${key}_open`);
     await Promise.all([
       pokemon.untint(250, 'Sine.easeOut'),

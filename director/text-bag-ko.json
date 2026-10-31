@@ -5,6 +5,7 @@
   "battle.pokemonBrokeFree": "안 돼!\n포켓몬이 볼에서 나와 버렸다!",
   "battle.noPokeballTrainer": "트레이너가 볼을 튕겨 내 버렸다!\n남의 것에 손대면 도둑!",
   "battle.noPokeballForce": "본 적 없는 힘이\n볼을 사용하지 못하게 한다.",
+  "battle.noPokeballMulti": "안돼! 2마리 있어서\n목표를 정할 수가 없어…!",
   "battle.regainHealth": "{{pokemonName}}[[는]]\n체력을 회복했다!",
   "battle.ppHealBerry": "{{pokemonNameWithAffix}}[[는]] {{berryName}}[[로]]\n{{moveName}}의 PP를 회복했다!",
   "party-ui-handler.anyEffect": "써도 효과가 없다.",

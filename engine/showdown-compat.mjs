@@ -40,13 +40,49 @@ export function revive(battle, pokemon, hp) {
 
 const SWITCH_ORDER = 103;
 
+// The side's first Pokemon on the field that can still act (a double battle can have a fainted Pokemon left in the first position)
+export const leadOf = side => side.active.find(p => p && !p.fainted) ?? side.active[0];
+
 export function chooseEventAction(battle, side, event) {
 	side.clearChoice();
-	side.choice.actions.push({ choice: 'event', event, order: SWITCH_ORDER, priority: 0, pokemon: side.active[0], side });
+	const lead = leadOf(side);
 
-	// The side's other Pokemon on the field do nothing this turn (a run or item takes the whole side's turn)
-	for (const pokemon of side.active.slice(1)) side.choice.actions.push({ choice: 'pass', pokemon, side });
+	// The side's other Pokemon on the field do nothing this turn (a run takes the whole side's turn)
+	for (const pokemon of side.active) {
+		side.choice.actions.push(pokemon === lead ? { choice: 'event', event, order: SWITCH_ORDER, priority: 0, pokemon, side } : { choice: 'pass', pokemon, side });
+	}
 	if (battle.allChoicesDone()) battle.commitChoices();
+}
+
+const MOVE_EVENTS = { mega: 'mega', megax: 'megax', megay: 'megay', zmove: 'zmove', ultra: 'ultra', dynamax: 'dynamax', max: 'dynamax', terastal: 'terastallize', terastallize: 'terastallize' };
+
+// One position's part of a side choice: 'move N [target] [gimmick]', 'switch N' or 'pass' (as Side#choose reads it)
+function chooseOne(side, text) {
+	const [kind, ...rest] = String(text ?? 'pass').trim().split(/\s+/);
+	if (kind === 'pass') return side.choosePass();
+	if (kind === 'switch') return side.chooseSwitch(rest.join(' '));
+	if (kind !== 'move') return false;
+	let targetLoc, event = '';
+	while (rest.length > 1) {
+		const last = rest.at(-1);
+		if (targetLoc === undefined && /^[-+]?[1-3]$/.test(last)) targetLoc = parseInt(last, 10);
+		else if (!event && MOVE_EVENTS[last]) event = MOVE_EVENTS[last];
+		else break;
+		rest.pop();
+	}
+	return side.chooseMove(rest.join(' '), targetLoc, event);
+}
+
+// A double battle turn where the Pokemon at one position uses an event action (a bag item) and the others take their own parts.
+// false (nothing chosen) when the engine refuses a part, as Battle#choose does
+export function chooseSlotEvent(battle, side, slot, event, parts) {
+	side.clearChoice();
+	for (const [i, pokemon] of side.active.entries()) {
+		if (i === slot) side.choice.actions.push({ choice: 'event', event, order: SWITCH_ORDER, priority: 0, pokemon, side });
+		else if (!chooseOne(side, parts[i]) || side.choice.error) { side.clearChoice(); return false; }
+	}
+	if (battle.allChoicesDone()) battle.commitChoices();
+	return true;
 }
 
 export function findTrap(battle, pokemon) {

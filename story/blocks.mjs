@@ -89,6 +89,9 @@ const SHINY = words({
 const NOT_SHINY = new Set(['notshiny', 'nonshiny', 'noshiny', '이로치아님', '이로치아니다', '이로치아니']);
 const OPPONENT = words({ wild: ['wild', '야생'], trainer: ['trainer', '트레이너', '사람'] });
 const RANK = words({ normal: ['normal', '일반', '보통'], boss: ['boss', '보스', 'ace', '강적'] });
+const FORMAT = words({ single: ['single', 'singles', 'singlebattle', '1v1', '싱글', '싱글배틀', '1대1'], double: ['double', 'doubles', 'doublebattle', '2v2', '더블', '더블배틀', '2대2'] });
+// Wild Pokemon in one battle: two is a wild double battle
+const WILD_MAX = 2;
 const TIME = words({ day: ['day', 'morning', 'dawn', 'noon', '낮', '아침', '새벽', '오후', '점심'], night: ['night', 'dusk', 'evening', '밤', '저녁', '황혼', '한밤'] });
 const BOSS_CLASS = /관장|사천왕|챔피언|gym\s*leader|elite\s*four|champion/i;
 
@@ -178,6 +181,9 @@ const BATTLE_KEYS = words({
   opponent: ['opponent', 'type', 'battle', 'vs', '상대', '종류', '배틀'], name: ['name', 'trainer', 'trainername', '이름', '트레이너이름'],
   gender: ['gender', 'sex', '성별'], look: ['look', 'looks', 'appearance', '모습', '외모', '겉모습'], class: ['class', 'trainerclass', 'job', '직업'], rank: ['rank', 'tier', '등급'],
   place: ['place', 'biome', 'location', 'area', '장소', '바이옴', '지형'], time: ['time', '시간', '시간대'], pokemon: ['pokemon', 'mon', '포켓몬'],
+  format: ['format', 'style', 'battlestyle', 'mode', '방식', '형식', '배틀방식', '배틀형식'],
+  ally: ['ally', 'partner', 'allyname', 'partnername', 'allytrainer', '동료', '파트너', '아군', '동료이름', '동료트레이너'],
+  allyPokemon: ['allypokemon', 'allymon', 'partnerpokemon', 'partnermon', '동료포켓몬', '파트너포켓몬', '아군포켓몬'],
 });
 const SET_KEYS = words({
   ability: ['ability', '특성'], moves: ['moves', 'move', '기술', '기술들'], item: ['item', 'helditem', 'hold', '도구', '지닌도구', '지닌물건'],
@@ -326,7 +332,7 @@ function parseSet(value, errors, dest, warnings = errors) {
 export function parseBattle(body) {
   const errors = [];
   let fatal = false;
-  const spec = { wild: null, name: null, gender: null, look: null, trainerClass: null, boss: null, place: 'plains', time: 'day', team: [] };
+  const spec = { wild: null, name: null, gender: null, look: null, trainerClass: null, boss: null, place: 'plains', time: 'day', format: null, ally: null, team: [] };
   for (const { key, value, line } of lines(body, errors)) {
     const k = BATTLE_KEYS.get(key);
     if (!k) { errors.push(note('unknownKey', { line })); continue; }
@@ -335,11 +341,23 @@ export function parseBattle(body) {
       if (r) spec.team.push(r.set); else fatal = true;
       continue;
     }
+    // A broken ally line only drops that Pokemon: the battle can still be played
+    if (k === 'allyPokemon') {
+      const r = parseSet(value, errors, false);
+      if (r) (spec.ally ??= { name: null, team: [] }).team.push(r.set);
+      continue;
+    }
     if (!value) { errors.push(note('noValue', { text: line })); continue; }
     if (k === 'opponent') {
       const o = OPPONENT.get(norm(value));
-      if (o) spec.wild = o === 'wild'; else errors.push(note('sideWord', { value }));
-    } else if (k === 'name') spec.name = value;
+      if (o) spec.wild = o === 'wild';
+      else if (FORMAT.has(norm(value))) spec.format = FORMAT.get(norm(value));
+      else errors.push(note('sideWord', { value }));
+    } else if (k === 'format') {
+      const f = FORMAT.get(norm(value));
+      if (f) spec.format = f; else errors.push(note('formatWord', { value }));
+    } else if (k === 'ally') (spec.ally ??= { name: null, team: [] }).name = value;
+    else if (k === 'name') spec.name = value;
     else if (k === 'class') spec.trainerClass = value;
     else if (k === 'gender') {
       const g = GENDER.get(norm(value));
@@ -361,8 +379,15 @@ export function parseBattle(body) {
   if (spec.wild == null) { errors.push(note('noSide')); fatal = true; }
   const n = spec.team.length;
   if (!n && !fatal) { errors.push(note('noMons')); fatal = true; }
-  if (spec.wild === true && n > 1) { errors.push(note('wildOne', { n })); fatal = true; }
+  if (spec.wild === true && n > WILD_MAX) { errors.push(note('wildMax', { max: WILD_MAX, n })); fatal = true; }
   if (spec.wild === false && n > PARTY_MAX) { errors.push(note('trainerMax', { max: PARTY_MAX, n })); fatal = true; }
+
+  // An ally fights beside the player in a trainer battle (a tag battle)
+  if (spec.ally) {
+    if (spec.wild) { errors.push(note('allyWild')); spec.ally = null; }
+    else if (!spec.ally.team.length) { errors.push(note('allyNoMons')); spec.ally = null; }
+    else if (spec.ally.team.length > PARTY_MAX) { errors.push(note('allyMax', { max: PARTY_MAX, n: spec.ally.team.length })); fatal = true; }
+  }
 
   // Without a rank, guess from the class (else the name)
   if (spec.boss == null) spec.boss = !spec.wild && BOSS_CLASS.test(`${spec.trainerClass ?? ''} ${spec.name ?? ''}`);

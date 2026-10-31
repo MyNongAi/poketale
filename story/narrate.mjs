@@ -181,8 +181,12 @@ function fromText(from, namer) {
 const hpText = (name, x) => `${name} HP ${x.before === null || x.before === undefined ? '' : `${x.before}% → `}${x.hp}%`;
 
 function sidesOf(read, sides = {}) {
-  return { mine: USER, theirs: sides.theirs || read.players?.theirs || 'Opponent', wild: !!sides.wild };
+  return { mine: USER, theirs: sides.theirs || read.players?.theirs || 'Opponent', wild: !!sides.wild,
+    ally: sides.ally ? { name: sides.ally.name || 'Ally', species: new Set((sides.ally.team ?? []).map(m => toID(m.species))) } : null };
 }
+
+// A Pokemon on the player's side that the tag battle ally sent out (by species: the battle block's ally pokemon lines)
+const isAlly = (mon, sides) => mon?.side === 'mine' && !!sides.ally?.species.has(toID(mon.species));
 
 function sentOutText(side, mons, sides) {
   if (side === 'theirs' && sides.wild) return `Wild ${mons} appeared`;
@@ -192,7 +196,7 @@ function sentOutText(side, mons, sides) {
 function eventText(e, namer, sides) {
   const mon = m => monText(m, namer);
   switch (e.type) {
-  case 'switch': return sentOutText(e.mon.side, mon(e.mon), sides);
+  case 'switch': return isAlly(e.mon, sides) ? `${sides.ally.name} sent out ${mon(e.mon)}` : sentOutText(e.mon.side, mon(e.mon), sides);
   case 'move': {
 
     const head = e.cont ? `${mon(e.mon)}'s ${namer.moves(e.move)}` : `${mon(e.mon)} used ${namer.moves(e.move)}`;
@@ -250,7 +254,11 @@ export function summaryLine(read, namer, { evolutions = [], sides = {} } = {}) {
   const who = sidesOf(read, sides);
   const list = mons => mons.map(m => monText(m, namer)).join(', ') || '-';
   const parts = [];
-  for (const side of ['mine', 'theirs']) if (s.sent[side].length) parts.push(`${sentOutText(side, list(s.sent[side]), who)}.`);
+  for (const side of ['mine', 'theirs']) {
+    const own = s.sent[side].filter(m => !isAlly(m, who)), ally = s.sent[side].filter(m => isAlly(m, who));
+    if (own.length) parts.push(`${sentOutText(side, list(own), who)}.`);
+    if (ally.length) parts.push(`${who.ally.name} sent out ${list(ally)}.`);
+  }
   if (s.fainted.length) parts.push(`Fainted: ${list(s.fainted)}.`);
   if (s.caught) parts.push(`Caught: ${monText(s.caught.mon, namer)} with ${namer.items(s.caught.ball)}.`);
   else if (s.ran) parts.push('Ran away.');

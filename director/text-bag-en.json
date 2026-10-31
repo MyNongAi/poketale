@@ -5,6 +5,7 @@
   "battle.pokemonBrokeFree": "Oh no!\nThe Pokémon broke free!",
   "battle.noPokeballTrainer": "The Trainer blocked your Poké Ball!\nDon’t be a thief!",
   "battle.noPokeballForce": "An unseen force prevents\nthe use of Poké Balls!",
+  "battle.noPokeballMulti": "You can only throw a Poké Ball\nwhen there is one Pokémon remaining!",
   "battle.regainHealth": "{{pokemonName}} regained\nhealth!",
   "battle.ppHealBerry": "{{pokemonNameWithAffix}} restored PP to its move {{moveName}}\nusing its {{berryName}}!",
   "party-ui-handler.anyEffect": "It won’t have any effect.",

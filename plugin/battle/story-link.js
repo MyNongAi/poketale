@@ -1,6 +1,6 @@
 import * as sim from '../../engine/browser-engine.mjs';
 import { findBlocks, findTags, findMarks, markText, parseBattle, parseAct, actBlock, actsIn, hashKey, messageId, battlesIn, battlesInText, stripForPrompt } from '../../story/blocks.mjs';
-import { readTable, writeTable, tableStatus, createFolds, applyBattleResult, toEngineSpec, pruneTable, stateVars } from '../../story/state.mjs';
+import { readTable, writeTable, tableStatus, createFolds, applyBattleResult, toEngineSpec, wantsDouble, pruneTable, stateVars } from '../../story/state.mjs';
 import { unreadableLine, isUnreadable } from '../../story/stored.mjs';
 import { WHAT, failed, refused, failureNote, failureText, ruleText } from '../../story/failure.mjs';
 import { LOCK_FREE } from '../../story/panel.mjs';
@@ -303,7 +303,8 @@ function cardView(pass, key, body) {
   const status = active?.key === key && active.origin.phase === 'starting' && pass?.id === idOf(active.origin)
     ? battlePhase(pass.survey, pass.save?.attempt ?? null).card(key) : battle.card(key);
 
-  return { lang, key, spec: spec ?? { wild: false, team: [], place: 'plains', time: 'day', boss: false }, errors: spec ? [] : errors,
+  const double = spec ? wantsDouble(spec, settings.battleStyle) : false;
+  return { lang, key, spec: spec ? { ...spec, double, ally: double ? spec.ally : null } : { wild: false, team: [], place: 'plains', time: 'day', boss: false }, errors: spec ? [] : errors,
     warnings: spec ? errors : [], latest: pass?.lastBattleKey === key, status, result: cardResult(info),
     progress: status === 'progress' ? (battle.phase === 'parked' ? save?.attempt?.balls ?? undefined : active.progress) : undefined, faces: faces(spec, key, pass?.chat ?? null), iron: settings.iron,
 
@@ -999,7 +1000,7 @@ async function prepareBattle(press, mode, retryOf, owner) {
     const playerName = persona.name;
 
     spec = start ? restartSpec(start, freshSeed()) : toEngineSpec(state, battle, { ...ctx, playerName, lang: currentLang(pass.chat) },
-      { seed: freshSeed(), formatid: ruleFormat(settings.rule), expShare: settings.expShare, picture: pictureOptions(key, pass.chat), player: playerOptions(persona.look) });
+      { seed: freshSeed(), formatid: ruleFormat(settings.rule), expShare: settings.expShare, style: settings.battleStyle, picture: pictureOptions(key, pass.chat), player: playerOptions(persona.look) });
     startBalls = { mine: state.party.map(ballOf), theirs: battle.team.map(() => 'ok') };
   }
 

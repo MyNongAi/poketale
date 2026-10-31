@@ -10,6 +10,7 @@ const WHY = {
   noItem: (c, n) => `there is no ${c.item ? n.items(c.item) : 'such item'} in the bag`,
   cantUse: (c, n) => `${n.items(c.item)} would have no effect`,
   cantRun: () => "there's no running from this battle",
+  double: () => 'a Double Battle is commanded on the battle screen',
 };
 
 function commandText(c, n) {

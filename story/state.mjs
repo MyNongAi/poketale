@@ -2,6 +2,7 @@ import { findBlocks, findTags, parseChange, hashKey, speciesName, messageId, nor
 import { expForLevel, calcExpGain, growthOf as growthOfSpecies } from '../engine/exp.mjs';
 import { STATS, STATUS_IDS, completeSet, levelEvolution, toID } from '../engine/mon.mjs';
 import { engineMember } from '../engine/input.mjs';
+import { startsFainted } from '../engine/initial-state.mjs';
 import { BAG_ITEMS, isBall } from '../engine/bag.mjs';
 import { ppUpCount } from '../engine/pp.mjs';
 import { DEFAULT_FORMAT, formatRules } from '../engine/rules.mjs';
@@ -791,7 +792,31 @@ export function storyEndTrainer(battle, outcome, team = null) {
   return { who, trainer: { name: battle.name, personal: personalName(battle), outcome, team: team ?? battle.team.map(({ species, level }) => ({ species, level })) } };
 }
 
-export function toEngineSpec(state, battle, ctx, { seed, formatid, picture, player, expShare } = {}) {
+// Whether a battle block asks for a double battle under a battle style. Wild: two wild Pokemon (unless always single).
+// Trainer: always double, or (auto) format double or an ally at the player's side
+export function wantsDouble(battle, style = 'auto') {
+  if (!battle) return false;
+  if (battle.wild) return style !== 'single' && (battle.team?.length ?? 0) > 1;
+  if (style === 'single') return false;
+  return style === 'double' || battle.format === 'double' || !!battle.ally;
+}
+
+// A block Pokemon as an engine member (the opponent's or an ally's)
+function blockMember(teamSet, uid, { sim, past } = {}) {
+  const { hpPercent, status, ppUps, ...blockSet } = clone(teamSet);
+  const set = past ? continuePast(sim, blockSet, past) : blockSet;
+
+  if (isCustomItem(set.item)) set.item = '';
+  const member = { uid, set };
+  if (ppUps) member.ppUps = ppUps;
+  if (hpPercent !== undefined) member.hpPercent = hpPercent;
+  if (status) member.status = status;
+  return member;
+}
+
+const ableCount = team => team.filter(member => !startsFainted(member)).length;
+
+export function toEngineSpec(state, battle, ctx, { seed, formatid, picture, player, expShare, style = 'auto' } = {}) {
   if (!state.party.length) fail('noParty');
   if (!state.party.some(m => m.hp !== 0)) fail('allFainted');
   const { sim } = ctx;
@@ -802,20 +827,23 @@ export function toEngineSpec(state, battle, ctx, { seed, formatid, picture, play
   const p1 = state.party.map(mon => engineMember(mon, state.customItems));
 
   const past = pairPast(sim, battle.team, trainersOf(state)[trainerKey(battle)]?.team ?? []);
-  const p2 = battle.team.map((teamSet, i) => {
-    const { hpPercent, status, ppUps, ...blockSet } = clone(teamSet);
-    const set = past[i] ? continuePast(sim, blockSet, past[i]) : blockSet;
+  const double = wantsDouble(battle, style);
+  const ableMine = ableCount(p1);
 
-    if (isCustomItem(set.item)) set.item = '';
-    const member = { uid: `foe-${i + 1}`, set };
-    if (ppUps) member.ppUps = ppUps;
-    if (hpPercent !== undefined) member.hpPercent = hpPercent;
-    if (status) member.status = status;
-    return member;
-  });
+  let p2 = battle.team.map((teamSet, i) => blockMember(teamSet, `foe-${i + 1}`, { sim, past: past[i] }));
+
+  // A second wild Pokemon only when both sides can field two: otherwise it would come out after the first in a single battle
+  if (battle.wild && !(double && ableMine >= 2 && ableCount(p2) >= 2)) p2 = p2.slice(0, 1);
+
+  // The ally only joins a battle that stays double (two able Pokemon on the opponent's side), else the player fights alone
+  const allyTeam = double && battle.ally ? battle.ally.team.map((teamSet, i) => blockMember(teamSet, `ally-${i + 1}`)) : [];
+  const partner = allyTeam.length && ableCount(allyTeam) && ableCount(p2) >= 2
+    ? { name: battle.ally.name || say(ctx.lang, 'spec.ally'), team: allyTeam } : null;
   return {
     ...(seed ? { seed: [...seed] } : {}),
     formatid: formatid || ctx.formatid || DEFAULT_FORMAT,
+    ...(double ? { double: true } : {}),
+    ...(partner ? { partner } : {}),
     p1: { name: ctx.playerName || PLAYER_NAME, team: p1,
 
       ...(player ? { trainerSprite: player.gender } : {}), ...(player?.silhouette ? { trainerSilhouette: true } : {}) },
