@@ -23,7 +23,7 @@ export function simpleAI(battle, sideId) {
   if (!request?.active?.length) throw new Error(`${sideId}: no move request`);
   return request.active.map((slot, i) => {
     const pokemon = side.active[i];
-    if (!pokemon || pokemon.fainted || !slot?.moves?.length) return 'pass';
+    if (!pokemon || pokemon.fainted || pokemon.volatiles?.commanding || !slot?.moves?.length) return 'pass';
     return moveChoice(battle, sideId, pokemon, slot.moves);
   }).join(', ');
 }

@@ -123,8 +123,10 @@ export function checkBagItem(battle, choice) {
 
 	const target = side.pokemon.find(p => p.m.uid === choice.target);
 	if (!target) return fail('notarget', choice.target);
+	if (target.m.partner) return fail('partner');
 	if (target.isActive && target.volatiles['embargo']) return fail('embargo');
-	if (item.revive) return target.fainted ? { ok: true } : fail('notfainted');
+	// A fainted Pokemon still holding its field position (a double battle with no one left to send out) stays there: reviving it would leave it on the field without acting
+	if (item.revive) return !target.fainted ? fail('notfainted') : side.active.includes(target) ? fail('onfield') : { ok: true };
 	if (item.pp) {
 
 		const slots = ppSlots(target, item, choice.move);

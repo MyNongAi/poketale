@@ -6,6 +6,7 @@ import en from './text-bag-en.json' with { type: 'json' };
 import { phrase } from './text.js';
 import { displayName } from '../engine/mon.mjs';
 import { leadOf } from '../engine/showdown-compat.mjs';
+import { ownText } from './text.js';
 import { DEFAULT_LANG } from './lang.js';
 
 const PHRASES = { ko, en };
@@ -57,6 +58,8 @@ export function createBag({ sim, battle, names, spec, wild, lang = DEFAULT_LANG 
     if (base.target === 'active') return { ...base, ...reason(checkBagItem(battle, { item: id, target: active.m.uid, ...at(position) }), active) };
 
     const slots = side.pokemon.map(pokemon => {
+      // A tag battle ally's Pokemon are the ally's to look after
+      if (pokemon.m.partner) return { blocked: ownText('own.partnerPokemon', {}, lang) };
       const target = pokemon.m.uid;
       if (!BAG_ITEMS[id].oneMove) return reason(checkBagItem(battle, { item: id, target, ...at(position) }), pokemon);
 

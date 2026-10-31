@@ -44,9 +44,12 @@ async function forcedSwitches(ctx, request) {
   return picks.join(', ');
 }
 
+// A Tatsugiri inside Dondozo (Commander) takes no action: Showdown passes for it
+const commanding = pokemon => !!pokemon?.volatiles?.commanding;
+
 // The first field position the player commands this turn: run and the whole-side choices start there
 function firstOwn(side, request) {
-  const i = request.active.findIndex((active, j) => { const p = side.active[j]; return p && !p.fainted && !active.commanding && !p.m.partner; });
+  const i = request.active.findIndex((active, j) => { const p = side.active[j]; return p && !p.fainted && !commanding(p) && !p.m.partner; });
   return i < 0 ? 0 : i;
 }
 
@@ -57,7 +60,7 @@ async function commands(ctx, request) {
   const first = firstOwn(side, request);
   for (let i = 0; i < request.active.length;) {
     const active = request.active[i], pokemon = side.active[i];
-    if (!pokemon || pokemon.fainted || active.commanding) { picks[i++] = 'pass'; continue; }
+    if (!pokemon || pokemon.fainted || commanding(pokemon)) { picks[i++] = 'pass'; continue; }
     if (lockedTurn(active)) { picks[i++] = 'move 1'; continue; }
     if (pokemon.m.partner) { picks[i] = slotMove(battle, 'p1', i); i++; continue; }
 

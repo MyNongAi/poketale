@@ -4,7 +4,7 @@ import { createNamer } from './ai-names.mjs';
 import { outcomeText } from './prompts.mjs';
 import { COMPAT_VAR } from './compat.mjs';
 import { customText } from './custom-items.mjs';
-import { battleStatusLines, ACT_RULES, ACT_PROMPT } from './act-prompts.mjs';
+import { battleStatusLines, ACT_RULES, ACT_PROMPT, DOUBLE_RULES } from './act-prompts.mjs';
 
 export const BATTLE_ENTRY = `@@depth 0
 
@@ -219,7 +219,7 @@ export function varTexts(state, { sim, battle = null, lang = 'ko', en = null } =
     else {
       party.push(`[Battle In Progress | Opponent: ${opponent}${Number.isInteger(battle.turn) && battle.turn > 0 ? ` | Turn: ${battle.turn}` : ''}]`);
 
-      if (battle.status && ACT_PROMPT) party.push(...battleStatusLines(battle.status, namer), ACT_RULES);
+      if (battle.status && ACT_PROMPT) party.push(...battleStatusLines(battle.status, namer), battle.status.double ? DOUBLE_RULES : ACT_RULES);
     }
   }
   (state?.party ?? []).forEach((mon, i) => {

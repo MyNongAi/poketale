@@ -48,6 +48,7 @@ export function extractResult(sim, battle) {
 	return {
 		ended: battle.ended,
 		turn: battle.turn,
+		...(battle.activePerHalf > 1 ? { double: true } : {}),
 		sides: battle.sides.map(side => ({
 			id: side.id,
 			name: side.name,

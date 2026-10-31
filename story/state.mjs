@@ -801,6 +801,20 @@ export function wantsDouble(battle, style = 'auto') {
   return style === 'double' || battle.format === 'double' || !!battle.ally;
 }
 
+// The battle block as the engine plays a spec made from it (toEngineSpec): the wild Pokemon that come out, the ally only when it
+// joins, and double only when both sides field two. The ally's team leaves out species the player also brought, so the story
+// never credits the player's Pokemon to the ally (battle logs name Pokemon, not trainers)
+export function playedBattle(battle, spec) {
+  if (!battle || !spec) return battle;
+  const mine = spec.p1?.team ?? [], ally = spec.partner?.team ?? [], foes = spec.p2?.team ?? [];
+  const double = !!spec.double && ableCount([...mine, ...ally]) >= 2 && ableCount(foes) >= 2;
+  const index = uid => Number(/^foe-(\d+)$/.exec(uid)?.[1]) - 1;
+  const team = battle.wild ? foes.map(m => battle.team[index(m.uid)]).filter(Boolean) : battle.team;
+  const shared = new Set(mine.map(m => toID(m.set?.species)));
+  return { ...battle, team, double,
+    ally: spec.partner && battle.ally ? { name: spec.partner.name, team: ally.map(m => m.set).filter(set => !shared.has(toID(set.species))) } : null };
+}
+
 // A block Pokemon as an engine member (the opponent's or an ally's)
 function blockMember(teamSet, uid, { sim, past } = {}) {
   const { hpPercent, status, ppUps, ...blockSet } = clone(teamSet);
@@ -815,6 +829,16 @@ function blockMember(teamSet, uid, { sim, past } = {}) {
 }
 
 const ableCount = team => team.filter(member => !startsFainted(member)).length;
+
+// Ally Pokemon a tag battle takes when the player's party leaves fewer slots
+const TAG_SHARE = 3;
+
+// The first n members of a team, able ones first, in team order
+function keepAble(team, n) {
+  if (team.length <= n) return team;
+  const kept = new Set(team.map((_, i) => i).sort((a, b) => startsFainted(team[a]) - startsFainted(team[b]) || a - b).slice(0, n));
+  return team.filter((_, i) => kept.has(i));
+}
 
 export function toEngineSpec(state, battle, ctx, { seed, formatid, picture, player, expShare, style = 'auto' } = {}) {
   if (!state.party.length) fail('noParty');
@@ -833,18 +857,23 @@ export function toEngineSpec(state, battle, ctx, { seed, formatid, picture, play
   let p2 = battle.team.map((teamSet, i) => blockMember(teamSet, `foe-${i + 1}`, { sim, past: past[i] }));
 
   // A second wild Pokemon only when both sides can field two: otherwise it would come out after the first in a single battle
-  if (battle.wild && !(double && ableMine >= 2 && ableCount(p2) >= 2)) p2 = p2.slice(0, 1);
+  if (battle.wild && !(double && ableMine >= 2 && ableCount(p2) >= 2)) p2 = keepAble(p2, 1);
 
-  // The ally only joins a battle that stays double (two able Pokemon on the opponent's side), else the player fights alone
-  const allyTeam = double && battle.ally ? battle.ally.team.map((teamSet, i) => blockMember(teamSet, `ally-${i + 1}`)) : [];
+  // The ally only joins a battle that stays double (two able Pokemon on the opponent's side), else the player fights alone.
+  // The battle's party menu holds both trainers' Pokemon in 6 slots: the ally brings up to 3 (more when the player has fewer)
+  const used = new Set(p1.map(m => m.uid));
+  const allyUid = i => { let uid = `ally-${i + 1}`; while (used.has(uid)) uid += '+'; return uid; };
+  const allyTeam = double && battle.ally
+    ? battle.ally.team.slice(0, Math.max(TAG_SHARE, PARTY_MAX - p1.length)).map((teamSet, i) => blockMember(teamSet, allyUid(i))) : [];
   const partner = allyTeam.length && ableCount(allyTeam) && ableCount(p2) >= 2
     ? { name: battle.ally.name || say(ctx.lang, 'spec.ally'), team: allyTeam } : null;
+  const mine = partner ? keepAble(p1, PARTY_MAX - allyTeam.length) : p1;
   return {
     ...(seed ? { seed: [...seed] } : {}),
     formatid: formatid || ctx.formatid || DEFAULT_FORMAT,
     ...(double ? { double: true } : {}),
     ...(partner ? { partner } : {}),
-    p1: { name: ctx.playerName || PLAYER_NAME, team: p1,
+    p1: { name: ctx.playerName || PLAYER_NAME, team: mine,
 
       ...(player ? { trainerSprite: player.gender } : {}), ...(player?.silhouette ? { trainerSilhouette: true } : {}) },
     p2: { name: battle.name || say(ctx.lang, battle.wild ? 'spec.wild' : 'spec.foe'), team: p2,

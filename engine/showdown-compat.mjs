@@ -41,7 +41,7 @@ export function revive(battle, pokemon, hp) {
 const SWITCH_ORDER = 103;
 
 // The side's first Pokemon on the field that can still act (a double battle can have a fainted Pokemon left in the first position)
-export const leadOf = side => side.active.find(p => p && !p.fainted) ?? side.active[0];
+export const leadOf = side => side.active.find(p => p && !p.fainted && !p.volatiles?.commanding) ?? side.active[0];
 
 export function chooseEventAction(battle, side, event) {
 	side.clearChoice();
@@ -80,6 +80,8 @@ export function chooseSlotEvent(battle, side, slot, event, parts) {
 	for (const [i, pokemon] of side.active.entries()) {
 		if (i === slot) side.choice.actions.push({ choice: 'event', event, order: SWITCH_ORDER, priority: 0, pokemon, side });
 		else if (!chooseOne(side, parts[i]) || side.choice.error) { side.clearChoice(); return false; }
+		// Each part fills its own position only (Showdown auto-passes skipped positions, which would shift the rest)
+		if (side.choice.actions.length !== i + 1) { side.clearChoice(); return false; }
 	}
 	if (battle.allChoicesDone()) battle.commitChoices();
 	return true;

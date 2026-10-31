@@ -37,9 +37,9 @@ export function battleStatusLines(result, n) {
   const [mine, theirs] = ['p1', 'p2'].map(id => result?.sides?.find(side => side.id === id));
   if (!mine || !theirs) return [];
   const out = [];
-  const me = mine.team.find(m => m.active), foe = theirs.team.find(m => m.active);
-  if (me) out.push(`[Me: ${monText(me, n)} | ${me.moves.map(m => `${n.moves(m.id)} (${m.pp}/${m.maxpp})`).join(', ')}]`);
-  if (foe) out.push(`[Foe: ${monText(foe, n)} | ${foe.moves.map(m => n.moves(m.id)).join(', ')}]`);
+  // Every Pokemon on the field: two a side in a double battle
+  for (const me of mine.team.filter(m => m.active)) out.push(`[Me: ${monText(me, n)} | ${me.moves.map(m => `${n.moves(m.id)} (${m.pp}/${m.maxpp})`).join(', ')}]`);
+  for (const foe of theirs.team.filter(m => m.active)) out.push(`[Foe: ${monText(foe, n)} | ${foe.moves.map(m => n.moves(m.id)).join(', ')}]`);
   const bench = side => side.team.filter(m => !m.active).map(m => monText(m, n)).join(', ');
   if (mine.team.length > 1) out.push(`[My bench: ${bench(mine)}]`);
   if (theirs.team.length > 1) out.push(`[Foe bench: ${bench(theirs)}]`);
@@ -51,6 +51,9 @@ export const answeredLine = played => (played
   : 'The command in this message is played out separately, so no <pkb-act> block is needed. Narrate the battle up to the command being given and no further.');
 
 export const ACT_PROMPT = true;
+
+// A double battle takes no story commands (director/plan.js): the story only tells what the battle log shows
+export const DOUBLE_RULES = '- This battle is a Double Battle, played on the battle screen. The user\'s words can\'t command it: never write a <pkb-act> block, and narrate only what the battle log tells you.';
 
 export const ACT_RULES = `- While a battle is in progress, the user's words in battle are commands - attempts, not results. When the user gives a command, end the response with:
 <pkb-act>

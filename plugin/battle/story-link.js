@@ -1,6 +1,6 @@
 import * as sim from '../../engine/browser-engine.mjs';
 import { findBlocks, findTags, findMarks, markText, parseBattle, parseAct, actBlock, actsIn, hashKey, messageId, battlesIn, battlesInText, stripForPrompt } from '../../story/blocks.mjs';
-import { readTable, writeTable, tableStatus, createFolds, applyBattleResult, toEngineSpec, wantsDouble, pruneTable, stateVars } from '../../story/state.mjs';
+import { readTable, writeTable, tableStatus, createFolds, applyBattleResult, toEngineSpec, wantsDouble, playedBattle, pruneTable, stateVars } from '../../story/state.mjs';
 import { unreadableLine, isUnreadable } from '../../story/stored.mjs';
 import { WHAT, failed, refused, failureNote, failureText, ruleText } from '../../story/failure.mjs';
 import { LOCK_FREE } from '../../story/panel.mjs';
@@ -303,8 +303,11 @@ function cardView(pass, key, body) {
   const status = active?.key === key && active.origin.phase === 'starting' && pass?.id === idOf(active.origin)
     ? battlePhase(pass.survey, pass.save?.attempt ?? null).card(key) : battle.card(key);
 
-  const double = spec ? wantsDouble(spec, settings.battleStyle) : false;
-  return { lang, key, spec: spec ? { ...spec, double, ally: double ? spec.ally : null } : { wild: false, team: [], place: 'plains', time: 'day', boss: false }, errors: spec ? [] : errors,
+  // Double or tag: as played for the running battle, as the settings would start it for a ready one, unknown (no note) otherwise
+  const played = active?.key === key ? active.origin.battle : null;
+  const double = played ? !!played.double : spec && status === 'ready' ? wantsDouble(spec, settings.battleStyle) : undefined;
+  const shown = spec && { ...spec, ...(played ? { team: played.team } : {}), double, ally: double ? (played ?? spec).ally : null };
+  return { lang, key, spec: shown || { wild: false, team: [], place: 'plains', time: 'day', boss: false }, errors: spec ? [] : errors,
     warnings: spec ? errors : [], latest: pass?.lastBattleKey === key, status, result: cardResult(info),
     progress: status === 'progress' ? (battle.phase === 'parked' ? save?.attempt?.balls ?? undefined : active.progress) : undefined, faces: faces(spec, key, pass?.chat ?? null), iron: settings.iron,
 
@@ -916,7 +919,7 @@ async function forfeitCard(press, pass) {
   }
   const { auto } = pass.save.attempt;
   const block = battleBlock(pass, press.key);
-  const origin = { ...pass.target, key: press.key, battle: parseBattle(block.body).spec, start: auto.spec.p1.team, phase: 'parked' };
+  const origin = { ...pass.target, key: press.key, battle: playedBattle(parseBattle(block.body).spec, auto.spec), start: auto.spec.p1.team, phase: 'parked' };
   const played = playedAt(auto, await storyCtx());
   await saveForfeit(origin, { turn: auto.turn, result: played?.result });
 }
@@ -1001,7 +1004,8 @@ async function prepareBattle(press, mode, retryOf, owner) {
 
     spec = start ? restartSpec(start, freshSeed()) : toEngineSpec(state, battle, { ...ctx, playerName, lang: currentLang(pass.chat) },
       { seed: freshSeed(), formatid: ruleFormat(settings.rule), expShare: settings.expShare, style: settings.battleStyle, picture: pictureOptions(key, pass.chat), player: playerOptions(persona.look) });
-    startBalls = { mine: state.party.map(ballOf), theirs: battle.team.map(() => 'ok') };
+    // The Pokemon the engine fields: a tag battle leaves part of the party out, and a wild battle can keep one wild Pokemon of two
+    startBalls = { mine: spec.p1.team.map(ballOf), theirs: spec.p2.team.map(() => 'ok') };
   }
 
   const { difficulty } = settings;
@@ -1011,7 +1015,7 @@ async function prepareBattle(press, mode, retryOf, owner) {
   const { myPicture } = persona.look;
   const me = entryMe(myPicture, myPicture === 'image' ? await loadPicture(risuai.pluginStorage, persona.name) : null);
 
-  const origin = { ...pass.target, index: at, key, battle, startBalls, phase: 'starting', start: (spec ?? from?.spec)?.p1?.team ?? null, lang: currentLang(pass.chat) };
+  const origin = { ...pass.target, index: at, key, battle: playedBattle(battle, spec ?? from?.spec), startBalls, phase: 'starting', start: (spec ?? from?.spec)?.p1?.team ?? null, lang: currentLang(pass.chat) };
   if (active) await parkActive();
 
   const markOpen = () => writeChat(origin, chat => {
